@@ -52,6 +52,11 @@ import java.util.function.Consumer;
 public final class Settings {
 
     /**
+     * Add extra ticks after breaking a block to bypass Grimm
+     */
+    public final Setting<Integer> extraBreakTicks = new Setting<>(0);
+
+    /**
      * Allow Baritone to break blocks
      */
     public final Setting<Boolean> allowBreak = new Setting<>(true);

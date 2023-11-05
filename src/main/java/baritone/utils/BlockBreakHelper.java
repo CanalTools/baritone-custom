@@ -17,6 +17,7 @@
 
 package baritone.utils;
 
+import baritone.Baritone;
 import baritone.api.utils.IPlayerContext;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.phys.BlockHitResult;
@@ -78,7 +79,7 @@ public final class BlockBreakHelper {
         } else if (didSwingArmLastTick) { //Finished breaking the block
             final int INSTA_BREAK_TICKS = 1;
             if (swingArmTicks > INSTA_BREAK_TICKS) {
-                coolDownTicksLeft = 6;
+                coolDownTicksLeft = Baritone.settings().extraBreakTicks.value;
             }
             stopBreakingBlock();
             didSwingArmLastTick = false;
