@@ -530,7 +530,9 @@ public final class BuilderProcess extends BaritoneProcessHelper implements IBuil
         if (Baritone.settings().distanceTrim.value) {
             trim();
         }
-
+        if (ctx.player().isUsingItem()) {
+            return new PathingCommand(null, PathingCommandType.REQUEST_PAUSE);
+        }
         Optional<Tuple<BetterBlockPos, Rotation>> toBreak = toBreakNearPlayer(bcc);
         if (toBreak.isPresent() && isSafeToCancel && ctx.player().onGround()) {
             // we'd like to pause to break this block
