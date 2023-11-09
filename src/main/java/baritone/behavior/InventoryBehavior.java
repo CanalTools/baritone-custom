@@ -26,11 +26,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.NonNullList;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.inventory.ClickType;
-import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.DiggerItem;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.PickaxeItem;
+import net.minecraft.world.item.*;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.block.Block;
@@ -72,6 +68,14 @@ public final class InventoryBehavior extends Behavior implements Helper {
         if (pick >= 9) {
             requestSwapWithHotBar(pick, 0);
         }
+        int shovel = bestToolAgainst(Blocks.DIRT, ShovelItem.class);
+        if (shovel >= 9) {
+            requestSwapWithHotBar(shovel, 1);
+        }
+        int axe = bestToolAgainst(Blocks.OAK_LOG, AxeItem.class);
+        if (axe >= 9) {
+            requestSwapWithHotBar(axe, 2);
+        }
         if (lastTickRequestedMove != null) {
             logDebug("Remembering to move " + lastTickRequestedMove[0] + " " + lastTickRequestedMove[1] + " from a previous tick");
             requestSwapWithHotBar(lastTickRequestedMove[0], lastTickRequestedMove[1]);
@@ -89,9 +93,9 @@ public final class InventoryBehavior extends Behavior implements Helper {
     }
 
     public OptionalInt getTempHotbarSlot(Predicate<Integer> disallowedHotbar) {
-        // we're using 0 and 8 for pickaxe and throwaway
+        // we're using 0. 1. 2 and 8 for pickaxe, shovel, axe and throwaway
         ArrayList<Integer> candidates = new ArrayList<>();
-        for (int i = 1; i < 8; i++) {
+        for (int i = 3; i < 8; i++) {
             if (ctx.player().getInventory().items.get(i).isEmpty() && !disallowedHotbar.test(i)) {
                 candidates.add(i);
             }
