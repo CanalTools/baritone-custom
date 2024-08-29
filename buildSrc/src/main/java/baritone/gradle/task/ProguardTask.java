@@ -201,9 +201,11 @@ public class ProguardTask extends BaritoneGradleTask {
         template.add(0, "-injars '" + this.artifactPath.toString() + "'");
         template.add(1, "-outjars '" + this.getTemporaryFile(PROGUARD_EXPORT_PATH) + "'");
 
-        template.add(2, "-libraryjars  <java.home>/jmods/java.base.jmod(!**.jar;!module-info.class)");
-        template.add(3, "-libraryjars  <java.home>/jmods/java.desktop.jmod(!**.jar;!module-info.class)");
-        template.add(4, "-libraryjars  <java.home>/jmods/jdk.unsupported.jmod(!**.jar;!module-info.class)");
+        String javaPath = getJavaBinPathForProguard();
+        javaPath = javaPath.replace("/bin/java", "");
+        template.add(2, "-libraryjars  " + javaPath + "/jmods/java.base.jmod(!**.jar;!module-info.class)");
+        template.add(3, "-libraryjars  " + javaPath + "/jmods/java.desktop.jmod(!**.jar;!module-info.class)");
+        template.add(4, "-libraryjars  " + javaPath + "/jmods/jdk.unsupported.jmod(!**.jar;!module-info.class)");
 
         {
             final Stream<File> libraries;

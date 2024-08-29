@@ -18,6 +18,7 @@
 package baritone.process;
 
 import baritone.Baritone;
+import baritone.api.Settings;
 import baritone.api.pathing.goals.Goal;
 import baritone.api.pathing.goals.GoalBlock;
 import baritone.api.pathing.goals.GoalComposite;
@@ -25,12 +26,10 @@ import baritone.api.pathing.goals.GoalGetToBlock;
 import baritone.api.process.IBuilderProcess;
 import baritone.api.process.PathingCommand;
 import baritone.api.process.PathingCommandType;
-import baritone.api.schematic.FillSchematic;
-import baritone.api.schematic.ISchematic;
-import baritone.api.schematic.IStaticSchematic;
-import baritone.api.schematic.SubstituteSchematic;
+import baritone.api.schematic.*;
 import baritone.api.schematic.format.ISchematicFormat;
 import baritone.api.utils.*;
+import baritone.api.utils.Rotation;
 import baritone.api.utils.input.Input;
 import baritone.pathing.movement.CalculationContext;
 import baritone.pathing.movement.Movement;
@@ -58,16 +57,10 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.item.context.UseOnContext;
-import net.minecraft.world.level.block.AirBlock;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.HorizontalDirectionalBlock;
-import net.minecraft.world.level.block.LiquidBlock;
-import net.minecraft.world.level.block.PipeBlock;
-import net.minecraft.world.level.block.RotatedPillarBlock;
-import net.minecraft.world.level.block.StairBlock;
-import net.minecraft.world.level.block.TrapDoorBlock;
+import net.minecraft.world.level.block.*;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Property;
+import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
@@ -288,8 +281,15 @@ public final class BuilderProcess extends BaritoneProcessHelper implements IBuil
                         continue; // irrelevant
                     }
                     BlockState curr = bcc.bsi.get0(x, y, z);
+
                     if (!(curr.getBlock() instanceof AirBlock) && !(curr.getBlock() == Blocks.WATER || curr.getBlock() == Blocks.LAVA) && !valid(curr, desired, false)) {
                         BetterBlockPos pos = new BetterBlockPos(x, y, z);
+                        if (Baritone.settings().dontBreakNextToLiquids.value && willReleaseWater(pos)) {
+                            continue;
+                        }
+                        if (Baritone.settings().dontBreakNextToFallingBlocks.value && willMakeBlocksFallIfBroken(pos)) {
+                            continue;
+                        }
                         Optional<Rotation> rot = RotationUtils.reachable(ctx, pos, ctx.playerController().getBlockReachDistance());
                         if (rot.isPresent()) {
                             return Optional.of(new Tuple<>(pos, rot.get()));
@@ -645,7 +645,10 @@ public final class BuilderProcess extends BaritoneProcessHelper implements IBuil
                     if (desired != null) {
                         // we care about this position
                         BetterBlockPos pos = new BetterBlockPos(x, y, z);
-                        if (valid(bcc.bsi.get0(x, y, z), desired, false)) {
+                        if (valid(bcc.bsi.get0(x, y, z), desired, false) ||
+                                (Baritone.settings().dontBreakNextToLiquids.value && willReleaseWater(pos)) ||
+                                (Baritone.settings().dontBreakNextToFallingBlocks.value && willMakeBlocksFallIfBroken(pos))
+                        ){
                             incorrectPositions.remove(pos);
                             observedCompleted.add(BetterBlockPos.longHash(pos));
                         } else {
@@ -672,7 +675,12 @@ public final class BuilderProcess extends BaritoneProcessHelper implements IBuil
                     }
                     if (bcc.bsi.worldContainsLoadedChunk(blockX, blockZ)) { // check if its in render distance, not if its in cache
                         // we can directly observe this block, it is in render distance
-                        if (valid(bcc.bsi.get0(blockX, blockY, blockZ), schematic.desiredState(x, y, z, current, this.approxPlaceable), false)) {
+                        if (Baritone.settings().dontBreakNextToLiquids.value && willReleaseWater(new BlockPos(blockX, blockY, blockZ))) {
+                            observedCompleted.add(BetterBlockPos.longHash(blockX, blockY, blockZ));
+                        } else if (Baritone.settings().dontBreakNextToFallingBlocks.value && willMakeBlocksFallIfBroken(new BlockPos(blockX, blockY, blockZ))) {
+                            observedCompleted.add(BetterBlockPos.longHash(blockX, blockY, blockZ));
+                        }
+                        else if (valid(bcc.bsi.get0(blockX, blockY, blockZ), schematic.desiredState(x, y, z, current, this.approxPlaceable), false)) {
                             observedCompleted.add(BetterBlockPos.longHash(blockX, blockY, blockZ));
                         } else {
                             incorrectPositions.add(new BetterBlockPos(blockX, blockY, blockZ));
@@ -698,6 +706,56 @@ public final class BuilderProcess extends BaritoneProcessHelper implements IBuil
         }
     }
 
+    private boolean willReleaseWater(BlockPos pos) {
+        BlockPos currentPos = pos;
+        do {
+            if (isLiquid(currentPos.above())) return true;
+            if (isFlowableLiquid(currentPos.north())) return true;
+            if (isFlowableLiquid(currentPos.south())) return true;
+            if (isFlowableLiquid(currentPos.east())) return true;
+            if (isFlowableLiquid(currentPos.west())) return true;
+            currentPos = currentPos.above();
+        } while (ctx.world().getBlockState(currentPos).getBlock() instanceof FallingBlock);
+
+        return false;
+    }
+
+    private boolean willMakeBlocksFallIfBroken(BlockPos pos) {
+        return isFallableBlock(pos) ||
+                isFallableBlock(pos.above()) ||
+                isFallableBlock(pos.north()) ||
+                isFallableBlock(pos.south()) ||
+                isFallableBlock(pos.east()) ||
+                isFallableBlock(pos.west()) ||
+                isFallableBlock(pos.below());
+    }
+
+    private boolean isFallableBlock(BlockPos pos) {
+        return ctx.world().getBlockState(pos).getBlock() instanceof FallingBlock;
+    }
+
+    @SuppressWarnings({"RedundantIfStatement", "resource"})
+    private boolean isFlowableLiquid(BlockPos pos) {
+        if (ctx.world() == null) return false;
+        BlockState blockState = ctx.world().getBlockState(pos);
+
+        if (!isLiquid(pos)) return false;
+        int level = blockState.getFluidState().getAmount();
+        if (level == FluidState.AMOUNT_FULL) return true;
+        else if (isLiquid(pos.below())) return false;
+        else {
+            if (blockState.getBlock() == Blocks.WATER && level == 7 || blockState.getBlock() == Blocks.LAVA && level == 6) {
+                // is the final level of water or lava, so it won't flow
+                return false;
+            }
+            return true;
+        }
+    }
+
+    private boolean isLiquid(BlockPos pos) {
+        return ! ctx.world().getBlockState(pos).getFluidState().isEmpty();
+    }
+
     private Goal assemble(BuilderCalculationContext bcc, List<BlockState> approxPlaceable) {
         return assemble(bcc, approxPlaceable, false);
     }
@@ -719,9 +777,10 @@ public final class BuilderProcess extends BaritoneProcessHelper implements IBuil
                 }
             } else {
                 if (state.getBlock() instanceof LiquidBlock) {
-                    // if the block itself is JUST a liquid (i.e. not just a waterlogged block), we CANNOT break it
-                    // TODO for 1.13 make sure that this only matches pure water, not waterlogged blocks
-                    if (!MovementHelper.possiblyFlowing(state)) {
+//                    sourceLiquids.add(pos);
+                    if (Baritone.settings().allowPlaceInAllWater.value) {
+                        placeable.add(pos);
+                    } else if (!MovementHelper.possiblyFlowing(state)) {
                         // if it's a source block then we want to replace it with a throwaway
                         sourceLiquids.add(pos);
                     } else {

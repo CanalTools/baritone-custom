@@ -17,10 +17,12 @@
 
 package baritone.utils;
 
+import baritone.Baritone;
 import baritone.api.utils.IPlayerContext;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
+
 
 /**
  * @author Brady
@@ -29,21 +31,23 @@ import net.minecraft.world.phys.HitResult;
 public final class BlockBreakHelper {
 
     private final IPlayerContext ctx;
-    private boolean didBreakLastTick;
+    private boolean didSwingArmLastTick;
 
+    private int coolDownTicksLeft; // Hot fix for 2b2t
+    private int swingArmTicks = 0;
     BlockBreakHelper(IPlayerContext ctx) {
         this.ctx = ctx;
     }
 
     public void stopBreakingBlock() {
         // The player controller will never be null, but the player can be
-        if (ctx.player() != null && didBreakLastTick) {
+        if (ctx.player() != null && didSwingArmLastTick) {
             if (!ctx.playerController().hasBrokenBlock()) {
                 // insane bypass to check breaking succeeded
                 ctx.playerController().setHittingBlock(true);
             }
             ctx.playerController().resetBlockRemoving();
-            didBreakLastTick = false;
+            didSwingArmLastTick = false;
         }
     }
 
@@ -51,8 +55,12 @@ public final class BlockBreakHelper {
         HitResult trace = ctx.objectMouseOver();
         boolean isBlockTrace = trace != null && trace.getType() == HitResult.Type.BLOCK;
 
-        if (isLeftClick && isBlockTrace) {
-            if (!didBreakLastTick) {
+        if (coolDownTicksLeft != 0) {
+            coolDownTicksLeft--;
+        } else if (isLeftClick && isBlockTrace) {
+            if (!didSwingArmLastTick) {
+                // Start breaking the block
+                swingArmTicks = 0;
                 ctx.playerController().syncHeldItem();
                 ctx.playerController().clickBlock(((BlockHitResult) trace).getBlockPos(), ((BlockHitResult) trace).getDirection());
                 ctx.player().swing(InteractionHand.MAIN_HAND);
@@ -61,14 +69,19 @@ public final class BlockBreakHelper {
             // Attempt to break the block
             if (ctx.playerController().onPlayerDamageBlock(((BlockHitResult) trace).getBlockPos(), ((BlockHitResult) trace).getDirection())) {
                 ctx.player().swing(InteractionHand.MAIN_HAND);
+                swingArmTicks += 1;
             }
 
             ctx.playerController().setHittingBlock(false);
 
-            didBreakLastTick = true;
-        } else if (didBreakLastTick) {
+            didSwingArmLastTick = true;
+        } else if (didSwingArmLastTick) { //Finished breaking the block
+            final int INSTA_BREAK_TICKS = 1;
+            if (swingArmTicks > INSTA_BREAK_TICKS) {
+                coolDownTicksLeft = Baritone.settings().extraBreakTicks.value;
+            }
             stopBreakingBlock();
-            didBreakLastTick = false;
+            didSwingArmLastTick = false;
         }
     }
 }

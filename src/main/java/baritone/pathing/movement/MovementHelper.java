@@ -72,6 +72,7 @@ public interface MovementHelper extends ActionCosts, Helper {
                 || b instanceof InfestedBlock // obvious reasons
                 // call context.get directly with x,y,z. no need to make 5 new BlockPos for no reason
                 || avoidAdjacentBreaking(bsi, x, y + 1, z, true)
+                || avoidAdjacentBreaking(bsi, x, y - 1, z, false)
                 || avoidAdjacentBreaking(bsi, x + 1, y, z, false)
                 || avoidAdjacentBreaking(bsi, x - 1, y, z, false)
                 || avoidAdjacentBreaking(bsi, x, y, z + 1, false)

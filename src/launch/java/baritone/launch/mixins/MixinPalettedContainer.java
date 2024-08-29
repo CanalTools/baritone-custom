@@ -84,7 +84,7 @@ public abstract class MixinPalettedContainer<T> implements IPalettedContainer<T>
     }
 
     @Unique
-    private IData<T> data() {
+    public IData<T> data() {
         try {
             // cast to Object first so the method handle doesn't hide the interface usage from proguard
             return (IData<T>) (Object) DATA_GETTER.invoke((PalettedContainer<T>) (Object) this);

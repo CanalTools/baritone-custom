@@ -56,7 +56,7 @@ public class MixinMinecraft {
 
     @Inject(
             method = "<init>",
-            at = @At("RETURN")
+            at = @At(value = "TAIL")
     )
     private void postInit(CallbackInfo ci) {
         BaritoneAPI.getProvider().getPrimaryBaritone();
